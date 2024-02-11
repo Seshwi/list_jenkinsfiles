@@ -476,6 +476,64 @@ pipeline {
     }
 }
 
+----------------------------------------------------------------------
+pipeline {
+    agent any
+
+    stages {
+        stage('clone') {
+            steps {
+                git branch: 'main', credentialsId: '4260e922-41d7-4456-a523-b27eb6224472', url: 'https://github.com/Seshwi/project-1-maven-jenkins-CICD-docker-eks-.git'
+            }
+        }
+   
+        stage('install') {
+            steps {
+              sh  'mvn install'
+            }
+        }
+        stage('Push artifacts into artifactory') {
+            steps {
+              rtUpload (
+                serverId: 'jfrog',
+                spec: '''{
+                      "files": [
+                        {
+                          "pattern": "*.war",
+                           "target": "seshwi/"
+                        }
+                    ]
+                }'''
+              )
+          }
+        }
+        
+        stage('docker build') {
+            steps {
+                sh 'docker build -t register .'
+            }
+        }
+        
+         stage('ecr') {
+            steps {
+              sh  '''
+                 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 880305499190.dkr.ecr.us-east-1.amazonaws.com
+                 docker tag register:latest 880305499190.dkr.ecr.us-east-1.amazonaws.com/register:latest
+                 docker push 880305499190.dkr.ecr.us-east-1.amazonaws.com/register:latest
+                 '''
+            }
+        }
+         stage('deploy') {
+            steps {
+               sh 'aws eks update-kubeconfig --name EKS_CLOUD --region ap-south-1'
+               sh  'kubectl apply -f regapp-deploy.yml'
+            }
+        }
+        
+        
+        
+    }
+}
 
 
 
